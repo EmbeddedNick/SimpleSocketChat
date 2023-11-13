@@ -34,8 +34,8 @@ namespace Client
             // Соединяемся с удаленным устройством
 
             // Устанавливаем удаленную точку для сокета
-            IPHostEntry ipHost = Dns.GetHostEntry("localhost");
-            IPAddress ipAddr = ipHost.AddressList[0];
+            //IPHostEntry ipHost = Dns.GetHostEntry("localhost");
+            IPAddress ipAddr = IPAddress.Parse("127.0.0.1");// ipHost.AddressList[0];
             IPEndPoint ipEndPoint = new IPEndPoint(ipAddr, port);
 
             Socket sender = new Socket(ipAddr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -58,8 +58,6 @@ namespace Client
             Console.WriteLine("\nОтвет от сервера: {0}\n\n", Encoding.UTF8.GetString(bytes, 0, bytesRec));
 
             // Используем рекурсию для неоднократного вызова SendMessageFromSocket()
-            if (message.IndexOf("<TheEnd>") == -1)
-                SendMessageFromSocket(port);
 
             // Освобождаем сокет
             sender.Shutdown(SocketShutdown.Both);
