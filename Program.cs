@@ -13,6 +13,7 @@ namespace ConsoleServer
     {
         static Dictionary<string, Socket> _clients = new Dictionary<string, Socket>();
         const int SERVER_PORT = 35072;
+        static object _lock = new object();
         enum EClientState 
         {
             WaitingForAutorization,
@@ -26,7 +27,8 @@ namespace ConsoleServer
             AutorizationFinishedGood = 0,
             MessageAdded = 0,
             StringAlreadyConsist = 1,
-            WrongCommandCode = 4
+            WrongCommandCode = 4,
+            ServerError = 5
         }
         static void ClientThread(object obj) 
         {
@@ -49,20 +51,38 @@ namespace ConsoleServer
                                 switch ((EChatCode)buf[0])
                                 {
                                     case EChatCode.Autorization:
-                                         nickName = Encoding.UTF8.GetString(buf, 1, receivedMessageLength - 1);
+                                        nickName = Encoding.UTF8.GetString(buf, 1, receivedMessageLength - 1);
                                         if (string.IsNullOrWhiteSpace(nickName))
                                         {
                                             client.Send(new byte[1] { (byte)EChatCode.EmptyNickName });
                                         }
-                                        else if (_clients.Keys.Contains(nickName))
-                                        {
-                                            client.Send(new byte[1] { (byte)EChatCode.StringAlreadyConsist });
-                                        }
                                         else
                                         {
-                                            client.Send(new byte[1] { (byte)EChatCode.AutorizationFinishedGood });
-                                            _clients.Add(nickName, client);
-                                            state = EClientState.Chatting;
+                                            nickName = nickName.Trim(new char[] {' ','\n','\r','\t'}) ;
+                                            if (_clients.Keys.Contains(nickName))
+                                            {
+                                                client.Send(new byte[1] { (byte)EChatCode.StringAlreadyConsist });
+                                            }
+                                            else
+                                            {
+                                                lock (_lock)
+                                                {
+                                                    try
+                                                    {
+                                                        _clients.Add(nickName, client);
+                                                        client.Send(new byte[1] { (byte)EChatCode.AutorizationFinishedGood });
+                                                        state = EClientState.Chatting;
+                                                    }
+                                                    catch (ArgumentException) 
+                                                    {
+                                                        client.Send(new byte[1] { (byte)EChatCode.StringAlreadyConsist });
+                                                    }
+                                                    catch (Exception)
+                                                    {
+                                                        client.Send(new byte[1] { (byte)EChatCode.ServerError });
+                                                    }
+                                                }
+                                            }
                                         }
                                         break;
                                     case EChatCode.Chatting:
@@ -112,6 +132,15 @@ namespace ConsoleServer
         }
         static void Main(string[] args)
         {
+            try
+            {
+                _clients.Add("Иван", null);
+                _clients.Add("Иван", null);
+            }
+            catch (Exception ex) 
+            {
+            
+            }
             // Устанавливаем для сокета локальную конечную точку
             IPHostEntry ipHost = Dns.GetHostEntry("localhost");
             IPAddress ipAddr = IPAddress.Parse("192.168.2.115");
